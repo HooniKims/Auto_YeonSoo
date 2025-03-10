@@ -11,12 +11,14 @@ from selenium.webdriver.support.select import Select
 
 from selenium.webdriver.support import expected_conditions as EC
 
-beti_id = input("beti ID : ")
-beti_pass = input("beti Password : ")
-web_address = input("web_address(ex : https://www.neti.go.kr : ")
+neti_id = input("neti ID : ")
+neti_pass = input("neti Password : ")
 
+# 웹 주소 자동 설정
+home_url = "https://www.neti.go.kr"
+print(f"잠시 후 {home_url}로 이동합니다...")
+time.sleep(2)  # 사용자가 메시지를 볼 수 있도록 잠시 대기
 
-home_url = web_address
 options = webdriver.ChromeOptions()
 options.add_argument('window-size=1920,1080')
 # SSL 인증서 오류 해결을 위한 추가 옵션들
@@ -49,12 +51,12 @@ login_slt.click()
 time.sleep(3)  # 페이지 전환 대기 시간
 id_s = '#userInputId'
 id_slt = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, id_s)))
-id_slt.send_keys(beti_id)
+id_slt.send_keys(neti_id)
 
 # 비밀번호 입력
 pass_s = '#userInputPw'
 pass_slt = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, pass_s)))
-pass_slt.send_keys(beti_pass)
+pass_slt.send_keys(neti_pass)
 
 # 로그인 버튼 클릭 (클래스 이용)
 login_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.btn_basic_color.btn_basic.one.mt30")))
@@ -89,5 +91,16 @@ for i in range(10000):
             next_btn.click()
             print("next버튼 클릭")
         except:
+            # 창이 닫혔는지 확인
+            try:
+                driver.current_url
+            except:
+                print("\n수강이 종료되었습니다. 아무키나 눌러주세요.")
+                input("anykey : ")
+                driver.quit()
+                exit(0)  # 즉시 프로그램 종료
             print("continue")
             continue
+
+# 프로그램 정상 종료
+driver.quit()
