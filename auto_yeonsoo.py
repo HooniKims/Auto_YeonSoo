@@ -13,6 +13,9 @@ import os
 import sys
 from subprocess import CREATE_NO_WINDOW
 
+# 전역 변수
+SPEED_ALREADY_SET = False
+
 # 사용자 입력
 neti_id = input("neti ID : ")
 neti_pass = input("neti Password : ")
@@ -24,41 +27,23 @@ time.sleep(2)
 
 # Chrome 옵션 설정
 options = webdriver.ChromeOptions()
-options.add_argument('window-size=1920,1080')
-
-# SSL/보안 관련 옵션 강화
-options.add_argument('--ignore-certificate-errors')
-options.add_argument('--ignore-ssl-errors')
-options.add_argument('--ignore-certificate-errors-spki-list')
-options.add_argument('--allow-insecure-localhost')
-options.add_argument('--disable-web-security')
-options.add_argument('--allow-running-insecure-content')
-options.add_argument('--reduce-security-for-testing')
 options.add_argument('--no-sandbox')
 options.add_argument('--disable-dev-shm-usage')
-
-# 안정성 향상을 위한 옵션들
 options.add_argument('--disable-gpu')
-options.add_argument('--disable-features=VizDisplayCompositor')
-options.add_argument('--disable-blink-features=AutomationControlled')
-options.add_experimental_option('excludeSwitches', ['enable-logging', 'enable-automation'])
-options.add_experimental_option('useAutomationExtension', False)
-options.set_capability("acceptInsecureCerts", True)
-options.add_argument("--mute-audio")
-
-# 프록시 설정 비활성화 (선택적)
-options.add_argument('--no-proxy-server')
+options.add_argument('--disable-extensions')
+options.add_argument('--disable-software-rasterizer')
+options.add_argument('--ignore-certificate-errors')
+options.add_argument('--log-level=3')
+options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
 # 기본 설정 변경
 prefs = {
     "profile.default_content_settings.popups": 0,
     "profile.default_content_setting_values.notifications": 2,
     "profile.default_content_setting_values.automatic_downloads": 1,
-    "profile.default_content_settings.geolocation": 2,
-    "profile.managed_default_content_settings.images": 1,
-    "profile.default_content_setting_values.mixed_script": 1,
-    "profile.content_settings.exceptions.automatic_downloads.*.setting": 1,
-    "profile.default_content_setting_values.insecure_content": "allow"
+    "download.prompt_for_download": False,
+    "download.directory_upgrade": True,
+    "safebrowsing.enabled": True
 }
 options.add_experimental_option("prefs", prefs)
 
@@ -76,79 +61,111 @@ except Exception as e:
 # 함수들을 코드 시작 부분에 배치
 def set_playback_speed(driver, wait):
     """재생 속도를 1.5배속으로 설정하는 함수"""
+    global SPEED_ALREADY_SET
+    
+    if SPEED_ALREADY_SET:
+        return True
+        
     try:
-        # 배속 버튼 클릭
-        speed_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button.vjs-playback-rate[title="재생 배속"]')))
-        speed_btn.click()
-        time.sleep(2)  # 메뉴가 완전히 열릴 때까지 대기
-
-        # 정확한 선택자를 사용하여 1.5배속 선택
-        speed_1_5 = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'li.vjs-menu-item[role="menuitemradio"] span.vjs-menu-item-text')))
-        if speed_1_5.text == '1.5x':
-            speed_1_5.click()
-            return True
-        return False
-    except Exception as e:
-        return False
-
-def get_chromedriver_path():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    chromedriver_name = "chromedriver.exe"
-    chromedriver_path = os.path.join(current_dir, chromedriver_name)
-    return chromedriver_path
-
-def initialize_driver():
-    try:
-        service = Service(get_chromedriver_path())
-        service.creation_flags = CREATE_NO_WINDOW
-        driver = webdriver.Chrome(service=service, options=options)
-        return driver
-    except Exception as e:
-        print(f"드라이버 초기화 실패: {str(e)}")
-        return None
-
-# 드라이버 초기화 시도
-max_attempts = 3
-for attempt in range(max_attempts):
-    try:
-        driver = initialize_driver()
-        if driver:
-            wait = WebDriverWait(driver, 20)
-            driver.get(home_url)
-            # 페이지 로드 후 잠시 대기
-            time.sleep(5)
-            break
-        else:
-            raise Exception("드라이버 초기화 실패")
-    except Exception as e:
-        print(f"드라이버 초기화 시도 {attempt + 1}/{max_attempts} 실패: {str(e)}")
-        if attempt == max_attempts - 1:
-            print("드라이버 초기화 실패. 프로그램을 종료합니다.")
-            input("아무 키나 누르면 종료됩니다...")
-            sys.exit(1)
         time.sleep(2)
+        
+        # 배속 버튼 찾기
+        speed_btn = wait.until(EC.presence_of_element_located((
+            By.CSS_SELECTOR, 
+            'button.vjs-playback-rate.vjs-menu-button.vjs-menu-button-popup.vjs-button[title="재생 배속"]'
+        )))
+        
+        # 마우스 오버 동작 시뮬레이션
+        action = webdriver.ActionChains(driver)
+        action.move_to_element(speed_btn).perform()
+        time.sleep(1)  # 메뉴가 나타날 때까지 1초 대기
+
+        # 1.5배속 메뉴 아이템 찾기 및 클릭
+        speed_1_5 = wait.until(EC.element_to_be_clickable((
+            By.CSS_SELECTOR, 
+            'span.vjs-menu-item-text'
+        )))
+        
+        if speed_1_5.text == '1.5x':
+            # JavaScript로 클릭 실행
+            driver.execute_script("arguments[0].click();", speed_1_5)
+            print("1.5배속 설정 완료")
+            SPEED_ALREADY_SET = True
+            return True
+        else:
+            print("1.5배속 옵션을 찾을 수 없음")
+            return False
+            
+    except Exception as e:
+        print(f"1.5배속 설정 중 오류 발생: {e}")
+        return False
 
 # 팝업 창 처리
-time.sleep(2)
-main_window = driver.current_window_handle
-handles = driver.window_handles
-for handle in handles:
-    if handle != main_window:
-        try:
-            driver.switch_to.window(handle)
-            if 'popupid' in driver.current_url.lower():
-                driver.close()
-        except:
-            continue
+def handle_popups(driver, wait):
+    """팝업 창을 처리하는 함수"""
+    try:
+        time.sleep(2)
+        main_window = driver.current_window_handle
+        handles = driver.window_handles
+        
+        for handle in handles:
+            if handle != main_window:
+                driver.switch_to.window(handle)
+                current_url = driver.current_url.lower()
+                
+                # 특정 팝업 무시 조건
+                if ('selecthpgpopup.do' in current_url or 
+                    'popupid=3000000835' in current_url or
+                    'popupid' in current_url):
+                    try:
+                        # 팝업의 "오늘 하루 보지 않기" 체크박스가 있다면 클릭
+                        checkbox = driver.find_element(By.CSS_SELECTOR, "input[type='checkbox']")
+                        if not checkbox.is_selected():
+                            checkbox.click()
+                            time.sleep(0.5)
+                    except:
+                        pass
+                    
+                    try:
+                        # 닫기 버튼 클릭
+                        close_btn = driver.find_element(By.CSS_SELECTOR, "button.btn_close, a.btn_close, #closeBtn, .close")
+                        close_btn.click()
+                    except:
+                        driver.close()
+                        
+        driver.switch_to.window(main_window)
+    except Exception as e:
+        print(f"팝업 처리 중 오류 발생: {str(e)}")
+        driver.switch_to.window(main_window)
 
-driver.switch_to.window(main_window)
-time.sleep(3)
+# 드라이버 초기화 및 웹사이트 접속
+try:
+    print("Chrome 브라우저를 시작합니다...")
+    driver = webdriver.Chrome(options=options)
+    wait = WebDriverWait(driver, 20)
+    driver.get(home_url)
+    print(f"{home_url}로 이동 완료")
+    
+    # 팝업 처리
+    handle_popups(driver, wait)
+    
+    time.sleep(5)
+except Exception as e:
+    print(f"브라우저 초기화 실패: {str(e)}")
+    print("\n프로그램을 종료합니다.")
+    print("1. Chrome 브라우저가 설치되어 있는지 확인해주세요.")
+    print("2. 인터넷 연결을 확인해주세요.")
+    input("\n아무 키나 누르면 종료됩니다...")
+    sys.exit(1)
 
 # 로그인 프로세스
 try:
     login_slt = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "로그인")))
     login_slt.click()
-
+    
+    # 로그인 페이지에서도 팝업 처리
+    handle_popups(driver, wait)
+    
     id_slt = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '#userInputId')))
     id_slt.send_keys(neti_id)
 
@@ -157,6 +174,10 @@ try:
 
     login_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.btn_basic_color.btn_basic.one.mt30")))
     login_btn.click()
+    
+    # 로그인 후에도 팝업 처리
+    handle_popups(driver, wait)
+    
 except Exception as e:
     print("로그인 과정에서 오류 발생:", str(e))
     driver.quit()
@@ -171,15 +192,16 @@ try:
 
     # 새 창으로 전환
     driver.switch_to.window(driver.window_handles[-1])
-    time.sleep(3)
+    time.sleep(2)  # 창 전환 대기 시간 단축
 
     # 재생 버튼 클릭과 1.5배속 설정
     try:
+        # 재생 버튼이 보이면 클릭
         play_btn = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'vjs-big-play-button')))
         play_btn.click()
-        time.sleep(3)  # 영상이 시작될 때까지 충분히 대기
+        time.sleep(2)  # 영상 시작 대기 시간 단축
         
-        # 1.5배속 설정
+        # 최초 1회 배속 설정
         set_playback_speed(driver, wait)
 
     except Exception as e:
@@ -196,6 +218,20 @@ while True:
     try:
         current_time = time.time()
         
+        # 창이 닫혔는지 먼저 확인
+        try:
+            driver.current_url
+        except:
+            print("\n수강이 종료되었습니다.")
+            driver.quit()
+            
+            # 카운트다운 추가
+            for i in range(3, 0, -1):
+                print(f"\r프로그램이 {i}초 후에 종료됩니다...", end='', flush=True)
+                time.sleep(1)
+            print("\n프로그램을 종료합니다.")
+            sys.exit(0)  # 즉시 프로그램 종료
+            
         if current_time - last_message_time >= message_interval:
             print("continue")
             last_message_time = current_time
@@ -204,26 +240,15 @@ while True:
         try:
             play_btn = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'vjs-big-play-button')))
             play_btn.click()
-            time.sleep(3)
-            
-            # 재생 시작 후 배속 재설정
-            set_playback_speed(driver, wait)
+            time.sleep(2)
         except:
-            # 창이 닫혔는지 확인
-            try:
-                driver.current_url
-            except:
-                print("\n수강이 종료되었습니다. 잠시 후 프로그램이 종료됩니다.")
-                time.sleep(3)  # 3초 대기 후 종료
-                driver.quit()
-                exit(0)
             pass
 
         # 퀴즈 완료 버튼 클릭 시도
         try:
             quiz_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div.quizShowBtn.draggable")))
             quiz_btn.click()
-            print("퀴즈를 마친후 클릭")
+            print("퀴즈 완료")
         except:
             pass
 
@@ -231,11 +256,11 @@ while True:
         try:
             next_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#next-btn")))
             next_btn.click()
-            print("next버튼 클릭")
+            print("다음 강의로 이동")
         except:
             pass
 
-        time.sleep(1)
+        time.sleep(0.5)
 
     except Exception as e:
         continue
