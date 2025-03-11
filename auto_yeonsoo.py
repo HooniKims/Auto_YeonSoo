@@ -39,6 +39,23 @@ driver = webdriver.Chrome(options=options)
 time.sleep(3)
 driver.get(home_url)
 
+# 팝업 창 처리
+time.sleep(2)  # 팝업이 뜰 때까지 잠시 대기
+main_window = driver.current_window_handle  # 메인 창 핸들 저장
+
+# 모든 창 핸들 가져오기
+handles = driver.window_handles
+for handle in handles:
+    if handle != main_window:
+        # 팝업 창으로 전환
+        driver.switch_to.window(handle)
+        # popupid가 URL에 포함된 창만 닫기
+        if 'popupid' in driver.current_url.lower():
+            driver.close()
+        
+# 메인 창으로 다시 전환
+driver.switch_to.window(main_window)
+
 # 페이지가 완전히 로드될 때까지 충분히 기다림
 time.sleep(5)
 
@@ -95,8 +112,7 @@ for i in range(10000):
             try:
                 driver.current_url
             except:
-                print("\n수강이 종료되었습니다. 아무키나 눌러주세요.")
-                input("anykey : ")
+                print("\n수강이 종료되었습니다. 창을 닫으셔도 좋습니다.")
                 driver.quit()
                 exit(0)  # 즉시 프로그램 종료
             print("continue")
