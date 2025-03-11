@@ -11,6 +11,7 @@ import time
 import getpass
 import os
 import sys
+from subprocess import CREATE_NO_WINDOW
 
 # 사용자 입력
 neti_id = input("neti ID : ")
@@ -24,22 +25,42 @@ time.sleep(2)
 # Chrome 옵션 설정
 options = webdriver.ChromeOptions()
 options.add_argument('window-size=1920,1080')
-# 안정성 향상을 위한 추가 옵션들
-options.add_argument('--no-sandbox')
-options.add_argument('--disable-dev-shm-usage')
-options.add_argument('--disable-gpu')
-options.add_argument('--disable-features=VizDisplayCompositor')
-options.add_argument('--disable-blink-features=AutomationControlled')
-# SSL 인증서 오류 해결을 위한 옵션들
+
+# SSL/보안 관련 옵션 강화
 options.add_argument('--ignore-certificate-errors')
 options.add_argument('--ignore-ssl-errors')
+options.add_argument('--ignore-certificate-errors-spki-list')
 options.add_argument('--allow-insecure-localhost')
 options.add_argument('--disable-web-security')
 options.add_argument('--allow-running-insecure-content')
-options.add_experimental_option('excludeSwitches', ['enable-logging'])
+options.add_argument('--reduce-security-for-testing')
+options.add_argument('--no-sandbox')
+options.add_argument('--disable-dev-shm-usage')
+
+# 안정성 향상을 위한 옵션들
+options.add_argument('--disable-gpu')
+options.add_argument('--disable-features=VizDisplayCompositor')
+options.add_argument('--disable-blink-features=AutomationControlled')
+options.add_experimental_option('excludeSwitches', ['enable-logging', 'enable-automation'])
 options.add_experimental_option('useAutomationExtension', False)
 options.set_capability("acceptInsecureCerts", True)
 options.add_argument("--mute-audio")
+
+# 프록시 설정 비활성화 (선택적)
+options.add_argument('--no-proxy-server')
+
+# 기본 설정 변경
+prefs = {
+    "profile.default_content_settings.popups": 0,
+    "profile.default_content_setting_values.notifications": 2,
+    "profile.default_content_setting_values.automatic_downloads": 1,
+    "profile.default_content_settings.geolocation": 2,
+    "profile.managed_default_content_settings.images": 1,
+    "profile.default_content_setting_values.mixed_script": 1,
+    "profile.content_settings.exceptions.automatic_downloads.*.setting": 1,
+    "profile.default_content_setting_values.insecure_content": "allow"
+}
+options.add_experimental_option("prefs", prefs)
 
 # 사용자 데이터 설정
 try:
@@ -52,18 +73,58 @@ try:
 except Exception as e:
     print(f"사용자 데이터 설정 중 오류 발생: {str(e)}")
 
-# 드라이버 초기화 (재시도 로직 추가)
+# 함수들을 코드 시작 부분에 배치
+def set_playback_speed(driver, wait):
+    """재생 속도를 1.5배속으로 설정하는 함수"""
+    try:
+        # 배속 버튼 클릭
+        speed_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button.vjs-playback-rate[title="재생 배속"]')))
+        speed_btn.click()
+        time.sleep(2)  # 메뉴가 완전히 열릴 때까지 대기
+
+        # 정확한 선택자를 사용하여 1.5배속 선택
+        speed_1_5 = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'li.vjs-menu-item[role="menuitemradio"] span.vjs-menu-item-text')))
+        if speed_1_5.text == '1.5x':
+            speed_1_5.click()
+            return True
+        return False
+    except Exception as e:
+        return False
+
+def get_chromedriver_path():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    chromedriver_name = "chromedriver.exe"
+    chromedriver_path = os.path.join(current_dir, chromedriver_name)
+    return chromedriver_path
+
+def initialize_driver():
+    try:
+        service = Service(get_chromedriver_path())
+        service.creation_flags = CREATE_NO_WINDOW
+        driver = webdriver.Chrome(service=service, options=options)
+        return driver
+    except Exception as e:
+        print(f"드라이버 초기화 실패: {str(e)}")
+        return None
+
+# 드라이버 초기화 시도
 max_attempts = 3
 for attempt in range(max_attempts):
     try:
-        driver = webdriver.Chrome(options=options)
-        wait = WebDriverWait(driver, 20)
-        driver.get(home_url)
-        break
+        driver = initialize_driver()
+        if driver:
+            wait = WebDriverWait(driver, 20)
+            driver.get(home_url)
+            # 페이지 로드 후 잠시 대기
+            time.sleep(5)
+            break
+        else:
+            raise Exception("드라이버 초기화 실패")
     except Exception as e:
         print(f"드라이버 초기화 시도 {attempt + 1}/{max_attempts} 실패: {str(e)}")
         if attempt == max_attempts - 1:
             print("드라이버 초기화 실패. 프로그램을 종료합니다.")
+            input("아무 키나 누르면 종료됩니다...")
             sys.exit(1)
         time.sleep(2)
 
@@ -116,18 +177,10 @@ try:
     try:
         play_btn = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'vjs-big-play-button')))
         play_btn.click()
-
+        time.sleep(3)  # 영상이 시작될 때까지 충분히 대기
+        
         # 1.5배속 설정
-        try:
-            # 배속 버튼 클릭 (수정된 셀렉터)
-            speed_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button.vjs-playback-rate[title="재생 배속"]')))
-            speed_btn.click()
-            time.sleep(2)
-            # 1.5배속 선택
-            speed_1_5 = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[contains(@class, 'vjs-menu-item-text') and text()='1.5x']")))
-            speed_1_5.click()
-        except Exception as e:
-            print("재생 속도 설정 중 오류 발생:", str(e))
+        set_playback_speed(driver, wait)
 
     except Exception as e:
         print("강의 시작 과정에서 오류 발생:", str(e))
@@ -143,29 +196,27 @@ while True:
     try:
         current_time = time.time()
         
-        # 상태 메시지 출력 (5초 간격)
         if current_time - last_message_time >= message_interval:
             print("continue")
             last_message_time = current_time
-
-        # 쿠키 갱신 (1시간마다)
-        if current_time % 3600 < 1:
-            for cookie in driver.get_cookies():
-                driver.add_cookie(cookie)
 
         # 재생 버튼 클릭 시도
         try:
             play_btn = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'vjs-big-play-button')))
             play_btn.click()
+            time.sleep(3)
             
-            # 수정된 1.5배속 재설정
-            time.sleep(1)
-            speed_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button.vjs-playback-rate[title="재생 배속"]')))
-            speed_btn.click()
-            time.sleep(1)
-            speed_1_5 = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[contains(@class, 'vjs-menu-item-text') and text()='1.5x']")))
-            speed_1_5.click()
+            # 재생 시작 후 배속 재설정
+            set_playback_speed(driver, wait)
         except:
+            # 창이 닫혔는지 확인
+            try:
+                driver.current_url
+            except:
+                print("\n수강이 종료되었습니다. 잠시 후 프로그램이 종료됩니다.")
+                time.sleep(3)  # 3초 대기 후 종료
+                driver.quit()
+                exit(0)
             pass
 
         # 퀴즈 완료 버튼 클릭 시도
@@ -182,16 +233,9 @@ while True:
             next_btn.click()
             print("next버튼 클릭")
         except:
-            # 창이 닫혔는지 확인
-            try:
-                driver.current_url
-            except:
-                print("\n수강이 종료되었습니다. 창을 닫으셔도 좋습니다.")
-                driver.quit()
-                exit(0)
+            pass
 
         time.sleep(1)
 
     except Exception as e:
-        print(f"예상치 못한 오류 발생: {str(e)}")
         continue
