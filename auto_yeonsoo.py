@@ -15,6 +15,7 @@ from subprocess import CREATE_NO_WINDOW
 
 # 전역 변수
 SPEED_ALREADY_SET = False
+PLAY_BUTTON_CLICKED = False  # 재생 버튼 클릭 여부를 추적하는 변수 추가
 
 # 사용자 입력
 neti_id = input("neti ID : ")
@@ -196,13 +197,16 @@ try:
 
     # 재생 버튼 클릭과 1.5배속 설정
     try:
-        # 재생 버튼이 보이면 클릭
-        play_btn = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'vjs-big-play-button')))
-        play_btn.click()
-        time.sleep(2)  # 영상 시작 대기 시간 단축
+        if not PLAY_BUTTON_CLICKED:  # 최초 1회만 재생 버튼 클릭
+            # 재생 버튼이 보이면 클릭
+            play_btn = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'vjs-big-play-button')))
+            play_btn.click()
+            PLAY_BUTTON_CLICKED = True
+            time.sleep(2)  # 영상 시작 대기 시간 단축
         
-        # 최초 1회 배속 설정
-        set_playback_speed(driver, wait)
+        # 최초 실행 시 1회만 배속 설정 시도
+        if not SPEED_ALREADY_SET:
+            set_playback_speed(driver, wait)
 
     except Exception as e:
         print("강의 시작 과정에서 오류 발생:", str(e))
@@ -213,6 +217,7 @@ except Exception as e:
 # 메인 루프
 last_message_time = 0
 message_interval = 5  # 5초 간격으로 메시지 출력
+video_ended = False
 
 while True:
     try:
@@ -230,37 +235,59 @@ while True:
                 print(f"\r프로그램이 {i}초 후에 종료됩니다...", end='', flush=True)
                 time.sleep(1)
             print("\n프로그램을 종료합니다.")
-            sys.exit(0)  # 즉시 프로그램 종료
+            sys.exit(0)
             
         if current_time - last_message_time >= message_interval:
             print("continue")
             last_message_time = current_time
 
-        # 재생 버튼 클릭 시도
+        # 퀴즈 완료 버튼이 있는지 확인
         try:
-            play_btn = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'vjs-big-play-button')))
-            play_btn.click()
-            time.sleep(2)
+            quiz_btn = driver.find_element(By.CSS_SELECTOR, "div.quizShowBtn.draggable")
+            if quiz_btn.is_displayed() and quiz_btn.is_enabled():
+                driver.execute_script("arguments[0].click();", quiz_btn)
+                print("퀴즈 완료")
+                time.sleep(0.1)  # 퀴즈 완료 후 최소 대기
+                
+                # 다음 버튼 즉시 클릭 시도
+                try:
+                    next_btn = driver.find_element(By.CSS_SELECTOR, "#next-btn")
+                    if next_btn.is_displayed() and next_btn.is_enabled():
+                        driver.execute_script("arguments[0].click();", next_btn)
+                        print("다음 강의로 이동")
+                        time.sleep(0.1)  # 페이지 전환 최소 대기
+                except:
+                    pass
+                continue  # 퀴즈 처리 후 다음 반복으로
         except:
             pass
 
-        # 퀴즈 완료 버튼 클릭 시도
+        # 영상 진행 상태 확인
         try:
-            quiz_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div.quizShowBtn.draggable")))
-            quiz_btn.click()
-            print("퀴즈 완료")
-        except:
+            video_player = driver.find_element(By.CSS_SELECTOR, 'video.vjs-tech')
+            current_time = driver.execute_script("return arguments[0].currentTime", video_player)
+            duration = driver.execute_script("return arguments[0].duration", video_player)
+            
+            # 영상이 끝나면 다음으로 진행
+            if not video_ended and duration > 0 and current_time >= duration - 0.5:
+                video_ended = True
+                print("영상 시청 완료")
+                
+                # 다음 버튼 즉시 클릭 시도
+                try:
+                    next_btn = driver.find_element(By.CSS_SELECTOR, "#next-btn")
+                    if next_btn.is_displayed() and next_btn.is_enabled():
+                        driver.execute_script("arguments[0].click();", next_btn)
+                        print("다음 강의로 이동")
+                        video_ended = False
+                        time.sleep(0.1)  # 페이지 전환 최소 대기
+                except:
+                    pass
+
+        except Exception as e:
             pass
 
-        # 다음 버튼 클릭 시도
-        try:
-            next_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#next-btn")))
-            next_btn.click()
-            print("다음 강의로 이동")
-        except:
-            pass
-
-        time.sleep(0.5)
+        time.sleep(0.1)
 
     except Exception as e:
         continue
