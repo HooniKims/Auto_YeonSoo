@@ -35,6 +35,7 @@ options.add_argument('--disable-extensions')
 options.add_argument('--disable-software-rasterizer')
 options.add_argument('--ignore-certificate-errors')
 options.add_argument('--log-level=3')
+options.add_argument('--mute-audio')  # 음소거 설정 추가
 options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
 # 기본 설정 변경
@@ -150,6 +151,33 @@ try:
     # 팝업 처리
     handle_popups(driver, wait)
     
+    # 최초 음소거 설정
+    try:
+        # JavaScript로 음소거 설정
+        driver.execute_script("""
+            var video = document.querySelector('video');
+            if (video) {
+                video.muted = true;
+            }
+        """)
+        print("음소거 설정 완료")
+    except:
+        pass
+    
+    # 최초 1.5배속 설정
+    try:
+        # JavaScript로 1.5배속 설정
+        driver.execute_script("""
+            var video = document.querySelector('video');
+            if (video) {
+                video.playbackRate = 1.5;
+            }
+        """)
+        print("1.5배속 설정 완료")
+        SPEED_ALREADY_SET = True
+    except:
+        pass
+    
     time.sleep(5)
 except Exception as e:
     print(f"브라우저 초기화 실패: {str(e)}")
@@ -195,7 +223,7 @@ try:
     driver.switch_to.window(driver.window_handles[-1])
     time.sleep(2)  # 창 전환 대기 시간 단축
 
-    # 재생 버튼 클릭과 1.5배속 설정
+    # 재생 버튼 클릭
     try:
         if not PLAY_BUTTON_CLICKED:  # 최초 1회만 재생 버튼 클릭
             # 재생 버튼이 보이면 클릭
@@ -203,11 +231,6 @@ try:
             play_btn.click()
             PLAY_BUTTON_CLICKED = True
             time.sleep(2)  # 영상 시작 대기 시간 단축
-        
-        # 최초 실행 시 1회만 배속 설정 시도
-        if not SPEED_ALREADY_SET:
-            set_playback_speed(driver, wait)
-
     except Exception as e:
         print("강의 시작 과정에서 오류 발생:", str(e))
 
@@ -228,13 +251,12 @@ while True:
         try:
             driver.current_url
         except:
-            print("\n수강이 종료되었습니다.")
+            print("\n모든 강의가 종료되었습니다.")
             driver.quit()
             
-            # 카운트다운 추가
-            for i in range(3, 0, -1):
-                print(f"\r프로그램이 {i}초 후에 종료됩니다...", end='', flush=True)
-                time.sleep(1)
+            # 종료 메시지 출력
+            print("\n아무 키나 눌러주세요.")
+            input()
             print("\n프로그램을 종료합니다.")
             sys.exit(0)
             
