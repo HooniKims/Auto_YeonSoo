@@ -216,7 +216,7 @@ except Exception as e:
 
 # 메인 루프
 last_message_time = 0
-message_interval = 5  # 5초 간격으로 메시지 출력
+message_interval = 30  # 30초 간격으로 메시지 출력
 video_ended = False
 last_progress = 0
 
