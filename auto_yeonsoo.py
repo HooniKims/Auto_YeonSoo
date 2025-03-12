@@ -218,6 +218,7 @@ except Exception as e:
 last_message_time = 0
 message_interval = 5  # 5초 간격으로 메시지 출력
 video_ended = False
+last_progress = 0
 
 while True:
     try:
@@ -268,21 +269,31 @@ while True:
             current_time = driver.execute_script("return arguments[0].currentTime", video_player)
             duration = driver.execute_script("return arguments[0].duration", video_player)
             
+            # 영상이 실제로 재생 중인지 확인
+            if current_time > last_progress:
+                last_progress = current_time
+            
             # 영상이 끝나면 다음으로 진행
-            if not video_ended and duration > 0 and current_time >= duration - 0.5:
-                video_ended = True
-                print("영상 시청 완료")
+            if not video_ended and duration > 0 and current_time >= duration - 0.1:
+                # 재생이 실제로 완료되었는지 한 번 더 확인
+                time.sleep(0.5)  # 잠시 대기 후 재확인
+                current_time = driver.execute_script("return arguments[0].currentTime", video_player)
                 
-                # 다음 버튼 즉시 클릭 시도
-                try:
-                    next_btn = driver.find_element(By.CSS_SELECTOR, "#next-btn")
-                    if next_btn.is_displayed() and next_btn.is_enabled():
-                        driver.execute_script("arguments[0].click();", next_btn)
-                        print("다음 강의로 이동")
-                        video_ended = False
-                        time.sleep(0.1)  # 페이지 전환 최소 대기
-                except:
-                    pass
+                if current_time >= duration - 0.1:
+                    video_ended = True
+                    print("영상 시청 완료")
+                    
+                    # 다음 버튼 즉시 클릭 시도
+                    try:
+                        next_btn = driver.find_element(By.CSS_SELECTOR, "#next-btn")
+                        if next_btn.is_displayed() and next_btn.is_enabled():
+                            driver.execute_script("arguments[0].click();", next_btn)
+                            print("다음 강의로 이동")
+                            video_ended = False
+                            last_progress = 0  # 진행 상태 초기화
+                            time.sleep(0.1)  # 페이지 전환 최소 대기
+                    except:
+                        pass
 
         except Exception as e:
             pass
