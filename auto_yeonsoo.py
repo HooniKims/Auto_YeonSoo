@@ -14,42 +14,44 @@ import sys
 from subprocess import CREATE_NO_WINDOW
 
 # 전역 변수
-SPEED_ALREADY_SET = False
-PLAY_BUTTON_CLICKED = False  # 재생 버튼 클릭 여부를 추적하는 변수 추가
+SPEED_ALREADY_SET = False  # 1.5배속 설정 여부
+PLAY_BUTTON_CLICKED = False  # 재생 버튼 클릭 여부
 
-# 사용자 입력
+# 사용자 입력 받기
+print("ⓒ 2025 HooniKim All rights reserved.")
 neti_id = input("neti ID : ")
 neti_pass = input("neti Password : ")
+course_selection = input("강좌를 선택하세요 예 '1 or 2 or 3'=>")
 
-# 웹 주소 자동 설정
+# 메인 URL 설정
 home_url = "https://www.neti.go.kr"
 print(f"잠시 후 {home_url}로 이동합니다...")
 time.sleep(2)
 
-# Chrome 옵션 설정
+# Chrome 브라우저 설정
 options = webdriver.ChromeOptions()
-options.add_argument('--no-sandbox')
-options.add_argument('--disable-dev-shm-usage')
-options.add_argument('--disable-gpu')
-options.add_argument('--disable-extensions')
-options.add_argument('--disable-software-rasterizer')
-options.add_argument('--ignore-certificate-errors')
-options.add_argument('--log-level=3')
-options.add_argument('--mute-audio')  # 음소거 설정 추가
-options.add_experimental_option('excludeSwitches', ['enable-logging'])
+options.add_argument('--no-sandbox')  # 보안 설정
+options.add_argument('--disable-dev-shm-usage')  # 메모리 사용량 제한
+options.add_argument('--disable-gpu')  # GPU 가속 비활성화
+options.add_argument('--disable-extensions')  # 확장 프로그램 비활성화
+options.add_argument('--disable-software-rasterizer')  # 소프트웨어 래스터라이저 비활성화
+options.add_argument('--ignore-certificate-errors')  # 인증서 오류 무시
+options.add_argument('--log-level=3')  # 로그 레벨 최소화
+options.add_argument('--mute-audio')  # 오디오 음소거
+options.add_experimental_option('excludeSwitches', ['enable-logging'])  # 로깅 비활성화
 
-# 기본 설정 변경
+# 브라우저 기본 설정
 prefs = {
-    "profile.default_content_settings.popups": 0,
-    "profile.default_content_setting_values.notifications": 2,
-    "profile.default_content_setting_values.automatic_downloads": 1,
-    "download.prompt_for_download": False,
-    "download.directory_upgrade": True,
-    "safebrowsing.enabled": True
+    "profile.default_content_settings.popups": 0,  # 팝업 차단
+    "profile.default_content_setting_values.notifications": 2,  # 알림 차단
+    "profile.default_content_setting_values.automatic_downloads": 1,  # 자동 다운로드 허용
+    "download.prompt_for_download": False,  # 다운로드 프롬프트 비활성화
+    "download.directory_upgrade": True,  # 다운로드 디렉토리 업그레이드
+    "safebrowsing.enabled": True  # 안전 브라우징 활성화
 }
 options.add_experimental_option("prefs", prefs)
 
-# 사용자 데이터 설정
+# 사용자 프로필 설정
 try:
     user = getpass.getuser()
     user_data = os.path.join(os.path.dirname(os.path.abspath(__file__)), "User Data")
@@ -60,9 +62,9 @@ try:
 except Exception as e:
     print(f"사용자 데이터 설정 중 오류 발생: {str(e)}")
 
-# 함수들을 코드 시작 부분에 배치
+# 재생 속도 설정 함수
 def set_playback_speed(driver, wait):
-    """재생 속도를 1.5배속으로 설정하는 함수"""
+    """영상 재생 속도를 1.5배속으로 설정"""
     global SPEED_ALREADY_SET
     
     if SPEED_ALREADY_SET:
@@ -77,19 +79,18 @@ def set_playback_speed(driver, wait):
             'button.vjs-playback-rate.vjs-menu-button.vjs-menu-button-popup.vjs-button[title="재생 배속"]'
         )))
         
-        # 마우스 오버 동작 시뮬레이션
+        # 배속 메뉴 표시
         action = webdriver.ActionChains(driver)
         action.move_to_element(speed_btn).perform()
-        time.sleep(1)  # 메뉴가 나타날 때까지 1초 대기
+        time.sleep(1)
 
-        # 1.5배속 메뉴 아이템 찾기 및 클릭
+        # 1.5배속 옵션 선택
         speed_1_5 = wait.until(EC.element_to_be_clickable((
             By.CSS_SELECTOR, 
             'span.vjs-menu-item-text'
         )))
         
         if speed_1_5.text == '1.5x':
-            # JavaScript로 클릭 실행
             driver.execute_script("arguments[0].click();", speed_1_5)
             print("1.5배속 설정 완료")
             SPEED_ALREADY_SET = True
@@ -102,9 +103,9 @@ def set_playback_speed(driver, wait):
         print(f"1.5배속 설정 중 오류 발생: {e}")
         return False
 
-# 팝업 창 처리
+# 팝업 처리 함수
 def handle_popups(driver, wait):
-    """팝업 창을 처리하는 함수"""
+    """불필요한 팝업 창들을 자동으로 처리"""
     try:
         time.sleep(2)
         main_window = driver.current_window_handle
@@ -115,12 +116,12 @@ def handle_popups(driver, wait):
                 driver.switch_to.window(handle)
                 current_url = driver.current_url.lower()
                 
-                # 특정 팝업 무시 조건
+                # 무시할 팝업 URL 확인
                 if ('selecthpgpopup.do' in current_url or 
                     'popupid=3000000835' in current_url or
                     'popupid' in current_url):
                     try:
-                        # 팝업의 "오늘 하루 보지 않기" 체크박스가 있다면 클릭
+                        # "오늘 하루 보지 않기" 체크
                         checkbox = driver.find_element(By.CSS_SELECTOR, "input[type='checkbox']")
                         if not checkbox.is_selected():
                             checkbox.click()
@@ -129,7 +130,7 @@ def handle_popups(driver, wait):
                         pass
                     
                     try:
-                        # 닫기 버튼 클릭
+                        # 팝업 닫기
                         close_btn = driver.find_element(By.CSS_SELECTOR, "button.btn_close, a.btn_close, #closeBtn, .close")
                         close_btn.click()
                     except:
@@ -186,61 +187,107 @@ except Exception as e:
 
 time.sleep(3)
 
-# 강의 시작
+# 강의 선택 및 시작
 try:
-    sugang_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#mainLoling_99 > li > div.clearfix.card_bottom > a.btn.btn_continue')))
-    sugang_btn.click()
+    # 나의 학습방 메뉴 클릭
+    my_study_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#container > div.main_top_bg.clearfix > div.por.pagew > div.service_type1 > div.frequent_service_wrap.clearfix.frequent_aa > div.frequent_service_list.clearfix.frequent_bb > ul > li:nth-child(2) > a')))
+    my_study_btn.click()
+    time.sleep(5)
+
+    # 강좌 선택
+    try:
+        if course_selection == "1":
+            course_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#crseList > li:nth-child(1) > div.txt_box > div.btn_box.mt0 > a.bnt_basic_line.small')))
+            course_btn.click()
+        elif course_selection == "2":
+            course_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#crseList > li:nth-child(2) > div.txt_box > div.btn_box.mt0 > a.bnt_basic_line.small')))
+            course_btn.click()
+        elif course_selection == "3":
+            course_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#crseList > li:nth-child(3) > div.txt_box > div.btn_box.mt0 > a.bnt_basic_line.small')))
+            course_btn.click()
+    except Exception as e:
+        print(f"강좌 선택 중 오류 발생: {str(e)}")
+        driver.quit()
+        exit(1)
+
+    time.sleep(2)
+
+    # 학습 콘텐츠 버튼이 있는지 확인하고 클릭
+    try:
+        # JavaScript로 학습 콘텐츠 버튼 클릭
+        driver.execute_script("""
+            var element = document.querySelector('#conList > ul.learning_list.listMain.remote > li > div > ul > li.clearfix.on > div > div:nth-child(1) > div > div > div > div.learn_con > a');
+            if (element) {
+                element.click();
+            }
+        """)
+        print("학습 콘텐츠 버튼 클릭 완료")
+        print("처음 영상 재생은 조금 시간이 걸릴 수 있습니다. 기다려 주세요.\n다음 영상으로 넘어갈 때는 느리지 않습니다.")
+            
+    except Exception as e:
+        print(f"학습 콘텐츠 버튼 클릭 중 오류 발생: {str(e)}")
+        print("현재 선택된 강좌로 진행합니다.")
+        pass
 
     # 새 창으로 전환
     driver.switch_to.window(driver.window_handles[-1])
-    time.sleep(2)  # 창 전환 대기 시간 단축
 
-    # 재생 버튼 클릭과 1.5배속 설정
+    # 강의 시작 버튼 클릭
     try:
-        if not PLAY_BUTTON_CLICKED:  # 최초 1회만 재생 버튼 클릭
-            # 재생 버튼이 보이면 클릭
-            play_btn = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'vjs-big-play-button')))
-            play_btn.click()
-            PLAY_BUTTON_CLICKED = True
-            time.sleep(2)  # 영상 시작 대기 시간 단축
-            
-            # 최초 1회만 1.5배속 설정
-            if not SPEED_ALREADY_SET:
-                try:
-                    # 배속 버튼 찾기
-                    speed_btn = wait.until(EC.presence_of_element_located((
-                        By.CSS_SELECTOR, 
-                        'button.vjs-playback-rate.vjs-menu-button.vjs-menu-button-popup.vjs-button[title="재생 배속"]'
-                    )))
-                    
-                    # 마우스 오버 동작 시뮬레이션
-                    action = webdriver.ActionChains(driver)
-                    action.move_to_element(speed_btn).perform()
-                    time.sleep(1)  # 메뉴가 나타날 때까지 1초 대기
+        lec_button_xpath = '//*[@id="conList"]/ul[1]/li/div/ul/li[1]/div/div[1]/div/div/div/div[2]/a'
+        lec_survey_button = wait.until(EC.element_to_be_clickable((By.XPATH, lec_button_xpath)))
+        lec_survey_button.click()
+    except:
+        pass
 
-                    # 1.5배속 메뉴 아이템 찾기 및 클릭
-                    speed_1_5 = wait.until(EC.element_to_be_clickable((
-                        By.CSS_SELECTOR, 
-                        'span.vjs-menu-item-text'
-                    )))
-                    
-                    if speed_1_5.text == '1.5x':
-                        # JavaScript로 클릭 실행
-                        driver.execute_script("arguments[0].click();", speed_1_5)
-                        print("1.5배속 설정 완료")
-                        SPEED_ALREADY_SET = True
-                except Exception as e:
-                    print(f"1.5배속 설정 중 오류 발생: {e}")
+    # 강의 보기 버튼 클릭
+    try:
+        btn = driver.find_element(By.CSS_SELECTOR, '#lectBtnControl > p').click()
+    except:
+        pass
 
-    except Exception as e:
-        print("강의 시작 과정에서 오류 발생:", str(e))
+    # 플레이어 컨트롤
+    try:
+        # 플레이 버튼 클릭
+        btn = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'vjs-big-play-button')))
+        btn.click()
+        
+        # 1.5배속 설정
+        if not SPEED_ALREADY_SET:
+            try:
+                # 배속 버튼 찾기
+                speed_btn = wait.until(EC.presence_of_element_located((
+                    By.CSS_SELECTOR, 
+                    'button.vjs-playback-rate.vjs-menu-button.vjs-menu-button-popup.vjs-button[title="재생 배속"]'
+                )))
+                
+                # 마우스 오버로 배속 메뉴 표시
+                action = webdriver.ActionChains(driver)
+                action.move_to_element(speed_btn).perform()
+
+                # 1.5배속 옵션 선택
+                speed_1_5 = wait.until(EC.element_to_be_clickable((
+                    By.CSS_SELECTOR, 
+                    'span.vjs-menu-item-text'
+                )))
+                
+                if speed_1_5.text == '1.5x':
+                    driver.execute_script("arguments[0].click();", speed_1_5)
+                    print("1.5배속 설정 완료")
+                    SPEED_ALREADY_SET = True
+            except Exception as e:
+                print(f"1.5배속 설정 중 오류 발생: {e}")
+    except:
+        pass
 
 except Exception as e:
     print("강의 시작 과정에서 오류 발생:", str(e))
+    driver.quit()
+    exit(1)
 
 # 메인 루프
 last_message_time = 0
-message_interval = 30  # 30초 간격으로 메시지 출력
+message_interval = 60  # 60초(1분) 간격으로 메시지 출력
 video_ended = False
 last_progress = 0
 
