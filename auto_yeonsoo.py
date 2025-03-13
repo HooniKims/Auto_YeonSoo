@@ -150,34 +150,6 @@ try:
     
     # 팝업 처리
     handle_popups(driver, wait)
-    
-    # 최초 음소거 설정
-    try:
-        # JavaScript로 음소거 설정
-        driver.execute_script("""
-            var video = document.querySelector('video');
-            if (video) {
-                video.muted = true;
-            }
-        """)
-        print("음소거 설정 완료")
-    except:
-        pass
-    
-    # 최초 1.5배속 설정
-    try:
-        # JavaScript로 1.5배속 설정
-        driver.execute_script("""
-            var video = document.querySelector('video');
-            if (video) {
-                video.playbackRate = 1.5;
-            }
-        """)
-        print("1.5배속 설정 완료")
-        SPEED_ALREADY_SET = True
-    except:
-        pass
-    
     time.sleep(5)
 except Exception as e:
     print(f"브라우저 초기화 실패: {str(e)}")
@@ -223,7 +195,7 @@ try:
     driver.switch_to.window(driver.window_handles[-1])
     time.sleep(2)  # 창 전환 대기 시간 단축
 
-    # 재생 버튼 클릭
+    # 재생 버튼 클릭과 1.5배속 설정
     try:
         if not PLAY_BUTTON_CLICKED:  # 최초 1회만 재생 버튼 클릭
             # 재생 버튼이 보이면 클릭
@@ -231,6 +203,35 @@ try:
             play_btn.click()
             PLAY_BUTTON_CLICKED = True
             time.sleep(2)  # 영상 시작 대기 시간 단축
+            
+            # 최초 1회만 1.5배속 설정
+            if not SPEED_ALREADY_SET:
+                try:
+                    # 배속 버튼 찾기
+                    speed_btn = wait.until(EC.presence_of_element_located((
+                        By.CSS_SELECTOR, 
+                        'button.vjs-playback-rate.vjs-menu-button.vjs-menu-button-popup.vjs-button[title="재생 배속"]'
+                    )))
+                    
+                    # 마우스 오버 동작 시뮬레이션
+                    action = webdriver.ActionChains(driver)
+                    action.move_to_element(speed_btn).perform()
+                    time.sleep(1)  # 메뉴가 나타날 때까지 1초 대기
+
+                    # 1.5배속 메뉴 아이템 찾기 및 클릭
+                    speed_1_5 = wait.until(EC.element_to_be_clickable((
+                        By.CSS_SELECTOR, 
+                        'span.vjs-menu-item-text'
+                    )))
+                    
+                    if speed_1_5.text == '1.5x':
+                        # JavaScript로 클릭 실행
+                        driver.execute_script("arguments[0].click();", speed_1_5)
+                        print("1.5배속 설정 완료")
+                        SPEED_ALREADY_SET = True
+                except Exception as e:
+                    print(f"1.5배속 설정 중 오류 발생: {e}")
+
     except Exception as e:
         print("강의 시작 과정에서 오류 발생:", str(e))
 
@@ -251,18 +252,32 @@ while True:
         try:
             driver.current_url
         except:
-            print("\n모든 강의가 종료되었습니다.")
+            print("\n수강이 종료되었습니다.")
             driver.quit()
             
-            # 종료 메시지 출력
-            print("\n아무 키나 눌러주세요.")
-            input()
+            # 카운트다운 추가
+            for i in range(3, 0, -1):
+                print(f"\r프로그램이 {i}초 후에 종료됩니다...", end='', flush=True)
+                time.sleep(1)
             print("\n프로그램을 종료합니다.")
             sys.exit(0)
             
         if current_time - last_message_time >= message_interval:
             print("continue")
             last_message_time = current_time
+
+        # 마지막 목차인지 확인
+        try:
+            last_chapter = driver.find_element(By.CSS_SELECTOR, 'p.desc[style="line-height:150%"][tabindex="-1"]')
+            if last_chapter.text == "마지막 목차입니다.":
+                print("\n모든 강의가 종료되었습니다.")
+                print("\n아무 키나 눌러주세요.")
+                input()
+                print("\n프로그램을 종료합니다.")
+                driver.quit()
+                sys.exit(0)
+        except:
+            pass
 
         # 퀴즈 완료 버튼이 있는지 확인
         try:
