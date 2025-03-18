@@ -162,8 +162,16 @@ except Exception as e:
 
 # 로그인 프로세스
 try:
-    login_slt = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "로그인")))
-    login_slt.click()
+    # iframe이 있다면 제거
+    try:
+        iframe = driver.find_element(By.ID, "u_confirm_wrapper_pc")
+        driver.execute_script("arguments[0].remove();", iframe)
+    except:
+        pass
+        
+    # JavaScript를 사용하여 로그인 버튼 클릭
+    login_slt = wait.until(EC.presence_of_element_located((By.LINK_TEXT, "로그인")))
+    driver.execute_script("arguments[0].click();", login_slt)
     
     # 로그인 페이지에서도 팝업 처리
     handle_popups(driver, wait)
